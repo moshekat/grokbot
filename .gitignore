@@ -1,0 +1,13 @@
+# Secrets: never commit
+.env
+.env.*
+!.env.example
+*.key
+*secret*.json
+client_secret*.json
+credentials*.json
+token*.json
+
+# Local scratch
+*.log
+.DS_Store
