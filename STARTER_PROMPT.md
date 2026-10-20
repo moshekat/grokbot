@@ -6,6 +6,8 @@ Copy everything below the line into a new session opened in this repo.
 
 You're picking up the **GrokBot** project: a self-hosted personal-assistant AI bot, our own alternative to SpaceXAI's paid "Grok Bot" product. The user dictates by voice, so "GROC bot" means Grok Bot.
 
+**Working directory:** `/media/moshe/MKData/Repositories/GrokBot` (note the case: `MKData`, not `mosheKat`; this filesystem is case-sensitive).
+
 ## Read these first, in this order
 1. `CLAUDE.md`: project context and working rules.
 2. `PROGRESS.md`: what's done, what's next, and environment notes (server, email, model).
@@ -13,8 +15,10 @@ You're picking up the **GrokBot** project: a self-hosted personal-assistant AI b
 4. `docs/PLAN.md`: the current plan (jobs, architecture, costs, phases, open questions).
 5. `docs/research/2026-10-20-landscape.md`: background on Grok Bot and the open-source alternatives (only if needed).
 
-## Where we are (as of 2026-10-20)
-- Research and planning are done. Nothing has been installed or created yet.
+## Where we are (as of 2026-10-20, last commit `4a3b39e`)
+- Research and planning are done. The repo is set up, pushed and in sync at https://github.com/moshekat/grokbot (branch `main`, **public**).
+- **No infrastructure work has started.** Nothing is created on the Proxmox host: no VM, no Docker, no Hermes, no Telegram bot, no Google OAuth client.
+- Git identity is set **locally only** (`moshekat` / `moshekat@users.noreply.github.com`), matching the ProxHetz repo. Pushing uses HTTPS with `gh` credentials (`gh auth setup-git`); `gh` is logged in as `moshekat`.
 - Plan:
   - **Hermes Agent** (NousResearch, MIT licence) on a **new VM on the user's Proxmox server (Hetzner)**, reached only over the NetBird VPN.
   - Model: **DeepSeek** (`deepseek-flash` by default). Set a spend cap.
@@ -35,9 +39,17 @@ You're picking up the **GrokBot** project: a self-hosted personal-assistant AI b
 3. **Explicit go-ahead to create the VM** (suggested: VM 123 `ai-assistant`, Ubuntu, 4 vCPU, 8 GB RAM, 50 GB disk, Docker) **and to install Hermes on the live server.**
 4. **A Telegram bot token** from @BotFather. The user creates this.
 
+These four are still **open**. They are also listed in `PROGRESS.md` under "Next".
+
+## Two open housekeeping questions (asked, not yet answered)
+- **Public or private repo?** It was pushed public, because that's where the user pointed and the research is shareable. It exposes the project's existence and architecture (no secrets, no host IP, no addresses). To flip it:
+  `gh repo edit moshekat/grokbot --visibility private --accept-visibility-change-consequences`
+- **Rewrite history to drop a personal work address?** The address was scrubbed from the working tree, but the **initial commit still contains it**, so it is retrievable from the public history. Rewriting means a force-push. The user has not asked for this yet; don't do it unprompted.
+
 ## Rules
 - This is a **production server** hosting client websites. Confirm with the user before any change to the server, and never expose new services publicly.
-- **Never commit secrets** (DeepSeek key, Telegram token, Google OAuth files). Keep them in `.env` or on the server, which `.gitignore` covers.
+- **Never commit secrets** (DeepSeek key, Telegram token, Google OAuth files). Keep them in `.env` or on the server, which `.gitignore` covers. `.env.example` lists the variable names, with no values.
+- **This repo is public.** No secrets, no host IPs or hostnames, no personal email addresses, no client data. Infrastructure specifics belong in the private ProxHetz repo or the user's notes.
 - Don't install community or ClawHub skills without reading their code first.
 - After each piece of work:
   - Update `PROGRESS.md`.
