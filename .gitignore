@@ -11,3 +11,8 @@ token*.json
 # Local scratch
 *.log
 .DS_Store
+__pycache__/
+*.pyc
+.venv/
+venv/
+node_modules/

@@ -4,7 +4,10 @@
 - **2026-10-20:** Researched the landscape (`docs/research/2026-10-20-landscape.md`).
 - **2026-10-20:** Got the user's answers: personal use first, possibly sold later; jobs are inbox, voice-to-email, calendar/to-do and drive dedup; WhatsApp disliked; has a DeepSeek key.
 - **2026-10-20:** Reviewed the server docs at `/media/moshe/MKData/Repositories/ProxHetz/` and revised `docs/PLAN.md` to the self-hosted Hermes plan.
-- **2026-10-20:** Added `STARTER_PROMPT.md` (a handover prompt for the next AI session) and a `.gitignore`. The user is moving this folder into a git repo.
+- **2026-10-20:** Added `STARTER_PROMPT.md` (a handover prompt for the next AI session) and a `.gitignore`.
+- **2026-10-20:** Moved the folder into a git repo and pushed it to https://github.com/moshekat/grokbot (branch `main`).
+  The repo is **public**, so infrastructure specifics (host IP, hostname, personal addresses) were removed from these docs;
+  they stay in the private ProxHetz repo and the user's own notes.
 
 ## Next
 - [ ] User gives the go-ahead on the plan and answers the open questions in `docs/PLAN.md`.

@@ -37,3 +37,9 @@ Append-only. Newest entries go at the bottom. Format: date, decision, reason, st
 
 ## 2026-10-20: email deletion = Gmail Trash only (recoverable for 30 days); shadow mode first; sending always needs approval
 - Status: proposed.
+
+## 2026-10-20: this repo is on GitHub, public, as `moshekat/grokbot`
+- Reason: the user asked for it to be pushed there. It holds research, planning and (later) our skills and tools, so it can be shared and sold from.
+- Consequence: infrastructure specifics (Proxmox host IP and hostname, personal email addresses) were stripped from `PROGRESS.md` and `docs/PLAN.md` before the first push. Those details stay in the private ProxHetz repo and the user's own notes.
+- Rule: keep it that way. No secrets, no host details, no client data in this repo.
+- Status: decided.
