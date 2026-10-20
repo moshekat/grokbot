@@ -30,7 +30,7 @@ You're picking up the **GrokBot** project: a self-hosted personal-assistant AI b
   - **Don't read or copy anything from its `secrets-backup/` folder.**
 
 ## Waiting on the user before Phase 1
-1. **Which inbox the bot should manage.** Google Workspace accounts are being consolidated, and candace@gritgrow.co.za is on the account that will be cancelled.
+1. **Which inbox the bot should manage.** Google Workspace accounts are being consolidated, and one address sits on the account that will be cancelled. (It's kept in the private notes, not here.)
 2. **The Proxmox host's actual RAM and CPU** (`free -h; nproc` on the host).
 3. **Explicit go-ahead to create the VM** (suggested: VM 123 `ai-assistant`, Ubuntu, 4 vCPU, 8 GB RAM, 50 GB disk, Docker) **and to install Hermes on the live server.**
 4. **A Telegram bot token** from @BotFather. The user creates this.
