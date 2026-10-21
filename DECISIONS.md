@@ -43,3 +43,83 @@ Append-only. Newest entries go at the bottom. Format: date, decision, reason, st
 - Consequence: infrastructure specifics (Proxmox host IP and hostname, personal email addresses) were stripped from `PROGRESS.md` and `docs/PLAN.md` before the first push. Those details stay in the private ProxHetz repo and the user's own notes.
 - Rule: keep it that way. No secrets, no host details, no client data in this repo.
 - Status: decided.
+
+## 2026-10-20: install Hermes from the official Docker image, pinned by tag
+- Reason: `nousresearch/hermes-agent` is published on Docker Hub with version tags (current release `v0.22.2`) and keeps all state in a `/opt/data` volume. A pinned image makes updates deliberate and rollback a tag change, and keeps the agent off the VM's host OS on a production server.
+- Alternative kept: the install script plus `hermes gateway install` (a systemd service), if the container's isolation blocks a skill.
+- Status: proposed; execute only after the user's go-ahead for Phase 1.
+
+## 2026-10-20: no separate Whisper; use Hermes' built-in voice transcription first
+- Reason: the Telegram gateway transcribes voice notes itself, so installing Whisper on the VM adds cost and maintenance for no gain until its quality is proven poor.
+- Status: proposed.
+
+## 2026-10-20: VM size 2–4 vCPU / 4–8 GB, Ubuntu 24.04, disk on `FourTStorage`
+- Reason: no local model, no GPU, no browser work; the load is API calls and cron. The `vms` pool is 72% full.
+- Supersedes: the earlier "4 vCPU / 8 GB, 50 GB" suggestion, which stays the ceiling.
+- Status: superseded by the VM 123 spec below (settled at 2 vCPU / 4 GB / 30 GB).
+
+## 2026-10-20: VM 123 `ai-assistant` is a full QEMU/KVM VM, not an LXC container
+- Spec: Ubuntu 24.04, 2 vCPU, 4 GB RAM, 30 GB disk on `FourTStorage`, OVMF/q35, cloud-init with the standard key, admin `greyroot` (sole login, passwordless sudo, `PermitRootLogin no`), QEMU agent, `onboot=1`, timezone `Africa/Johannesburg`, a Kea DHCP reservation in the server's guest range (the exact address is in the private ProxHetz notes, not here), NetBird peer, no public ingress. The user creates the VM per the ProxHetz protocols; the container work happens after that.
+- Reason: Hermes runs in Docker, which needs a real kernel/namespace stack on this host; and the bot holds mail and calendar credentials plus shell access, so it belongs behind a VM boundary rather than in a shared container host. Mirrors the existing VM 199 pattern.
+- Status: decided. The VM does not exist yet.
+
+## 2026-10-20: the inbox runs 5× per day, daytime only, in CAT
+- Times: **08:00, 10:30, 13:00, 15:30, 17:30 Africa/Johannesburg** (UTC+2, no DST). Nothing overnight.
+- Reason: the user's own working hours; a digest at 3 a.m. is noise, and an overnight run only creates stale labels by morning.
+- Status: proposed; the times are the user's to change.
+
+## 2026-10-20: container clock and cron in `Africa/Johannesburg`
+- Reason: `TZ=Africa/Johannesburg` in the compose file, and the Hermes host runs the same zone. Cron expressions then mean what they read, and there is no mental arithmetic between UTC and CAT when reading logs.
+- Status: decided (implemented in `deploy/docker-compose.yml`).
+
+## 2026-10-20: our code lives in this repo; configuration and secrets live on the VM; the client platform repo is not involved
+- Split:
+  - **This repo (`grokbot`, public):** the generic, portable skills, scripts and deploy config. Nothing instance-specific is hardcoded; the inbox address, OAuth client, targets and schedule arrive as environment variables.
+  - **The VM (`/srv/hermes`):** `/srv/hermes/.env` (mode 600) with the real values, plus `/srv/hermes/data`, which holds Hermes' own memory, sessions and any skills it writes for itself.
+  - **`greyonion-platform` (private):** untouched by this project. It is the client platform monorepo (Java: banking, DocBot, Wholesome, Grit); the assistant is neither a client app nor buildable with it.
+- Reason: the assistant holds the user's personal mail and calendar. Mixing that with client production code would couple two very different release and secrets lifecycles, and would sink a potentially sellable tool into a private client repo. Keeping the code generic in public and the instance values private is also exactly what makes it reusable by someone else later.
+- Rule: if a value differs per installation, it goes in `.env`; if it is a generic rule or behaviour, it goes in the repo.
+- Status: decided.
+
+## 2026-10-20: skills are Markdown instructions plus, where needed, a Python script
+- Reason: Hermes is Python, so our scripts sit alongside it with no extra runtime (the `.gitignore` already covers `.venv/` and `requirements.txt`). The split keeps the *judgment* (the `SKILL.md` rules) editable by someone who doesn't read Python, and the *mechanics* (API calls, hashing) testable without an LLM in the loop.
+- Libraries: `google-auth` + `google-api-python-client` for Gmail, Calendar and Tasks; the standard library (`hashlib`, `sqlite3`, `pathlib`) for drive dedup. No LLM SDK: the model is reached through Hermes, not through our code.
+- Status: decided.
+
+## 2026-10-21: one assistant with a task spine; email, voice, calendar and lists are inputs to it
+- Shape: **subjects → tasks → calendar / reminders / lists**. A subject is a person, project, admin matter, asset or place; a task belongs to a subject; email triage, voice notes and calendar invites all land in the same store. Design in `docs/TASK-SPINE.md`.
+- Reason: the four jobs in `docs/PLAN.md` were listed as separate features. In practice every one of them produces the same two things — an **open task** and a **fact about a subject** — and without a shared spine triage dead-ends in a Gmail label and each new feature grows its own storage.
+- Consequence: `triage.py`'s needs-you bucket upserts a task instead of only labelling. The digest reads from the spine.
+- Status: decided.
+
+## 2026-10-21: the subject store is files first (Markdown + YAML), with a derived SQLite FTS5 index; no MySQL
+- Layout: one folder per subject under the profile data dir, each with `SUBJECT.md` (frontmatter: `id`, `title`, `kind`, `status`, `next_action`, `due`, `people`, `tags`), an append-only `timeline.md`, `docs/` and `mail/`. A sibling `lists/` folder holds named lists. A bounded "hot snapshot" of active subjects and due tasks is injected each session, mirroring how Hermes injects its own `MEMORY.md`.
+- Index: `spine/_index.db`, SQLite **FTS5** — the engine Hermes already uses for `session_search` — and **derived**: it may be deleted and rebuilt (`spine reindex`) and must never hold a fact the files don't.
+- Reason: Markdown is readable by the model without an ORM, fixable by the user in a text editor, and survives `grep`, git, rsync, Nextcloud and tar. Export to a future customer is a folder copy. MySQL would add a daemon, credentials and migrations to buy concurrency a single-tenant assistant doesn't use.
+- Revisit: only if a hosted many-tenant version makes the case.
+- Status: decided.
+
+## 2026-10-21: lists are first-class, but we build no list feature
+- What we use instead: Hermes' native **`todo_list`** tool for flat todos, the `google-workspace` skill (Google Tasks) when a list should live on a phone, `product-price-monitor` for "watch until the price drops", `weekly-review-planning` for the weekly reset.
+- What we add: one Markdown file per **named** list (`pharmacy`, `hardware`, `movies`) under `spine/lists/`, so a name always resolves to one file and the list inherits search, backup and export.
+- Reason: a name like "the pharmacy list" needs one unambiguous home; a flat todo tool has no names.
+- Status: decided.
+
+## 2026-10-21: single-tenant first, multi-tenant-ready
+- Rules: the data path comes from an env var (never a hardcoded `/opt/data`); no fact is stored as "the user's X" — facts hang off a subject id; one profile = one assistant = one spine, so a second person is a second profile, not a row; per-installation values stay env vars; export is a folder copy.
+- Reason: building for one user now is the fastest path to something that works, but a second family member or a customer is the likely next step (`docs/research/2026-10-21-market.md`), and these are cheap constraints now and an expensive rewrite later.
+- Status: decided.
+
+## 2026-10-21: reminders use three channels by importance
+- **Telegram digest** (default, batched, working hours), **ntfy** push for time-sensitive items, **real calendar alarm** for things that must not be missed (medication, flights). Nothing fires overnight unless the user asked for it.
+- Reason: one channel either under- or over-alerts. A digest is right for most tasks; a calendar alarm is the only thing a phone will actually wake you for.
+- Status: proposed.
+
+## 2026-10-21: the spine ships as Markdown rules first, no CLI yet
+- First slice: `skills/subjects/` with `SKILL.md` rules, a canonical `EXAMPLE.md` the model copies, and a read-only `validate.py` that checks frontmatter. No `spine.py`, no index, no `triage.py` writer.
+- Reason: the operations that deserve code aren't known yet. A week of real use names them; writing the CLI now would be guessing at an API. The one thing that *does* warrant code is validation, because a malformed `SUBJECT.md` is silent otherwise.
+- Graduate to `spine.py` when either: the model gets frontmatter wrong more than once in ~10 subjects, or a computed view is wanted (e.g. "everything due in the next 7 days across all subjects"). The second will come first.
+- Ship skills via `skills.external_dirs` in `config.yaml`, not a copy into `/opt/data/skills`, so the repo stays the source of truth and a `git pull` + restart is the whole update.
+- Status: decided.
+
+
