@@ -230,6 +230,64 @@ Memory: `base` peaks around 390 MB RSS, which fits the 4 GB VM. `small` is a
 reasonable upgrade; `medium`/`large-v3` are not for this box. The VM has **no
 swap**, so a large model can OOM the gateway.
 
+### Voice input is poor — where the quality actually comes from
+
+Reported 2026-10-21: voice messages transcribe "kinda badly". Findings:
+
+- **`base` is the best model this box can run.** `small` needs roughly 2× the
+  RAM; with 3.9 GB total, 2.8 GB available and **no swap**, an OOM kill of the
+  gateway is the likely outcome. Do not upgrade as the first move.
+- **A model swap is not the fix.** `tiny` is markedly worse in every language.
+  The ceiling is the model class, not a misconfiguration — this is a 2-core VM
+  doing CPU int16 inference.
+- **Language is forced to `en`.** It is correct for the user and gives no
+  accuracy penalty. Setting `""` (auto-detect) makes it *worse* on short clips,
+  because detection happens on a few seconds of audio.
+- **No STT errors in the logs.** The whisper model loads and transcribes; the
+  output is just approximate. Silence-confidence and word-error numbers below
+  `base` ~30 s of speech are what you would expect from `base`.
+
+Because Hermes behind this bot is a **DeepSeek** model and DeepSeek has no audio
+API, `local` is the only path — there is no cloud STT to fall back to unless a
+separate key (Groq, OpenAI, ElevenLabs) is added to `.env`.
+
+How to actually improve it, cheapest first:
+
+1. **Speak in whole sentences, one per message.** Quality drops off sharply on
+   short single-word clips, which is most of what the user sends.
+2. **Send the audio as a file/voice note rather than a very short clip** — more
+   context per inference means better punctuation and fewer dropped words.
+3. **Fix the transcription cache ownership** (see below). It logs an error on
+   every start and is not the cause of the quality, but it is a real bug.
+4. **`small` is the only worthwhile model step up, and it needs swap first.**
+   At least 2 GB of swap, which also protects the gateway generally. Attempt
+   this only with the memory ceiling in mind.
+5. **A cloud STT key** (Groq's whisper-large-v3 is cheap and fast) if quality
+   remains unacceptable. That changes the cost model, so it is a decision, not
+   a tweak.
+
+### Known bug: the STT cache is root-owned
+
+`HF_HOME=/opt/data/cache/huggingface` is written by the container, which runs
+as **root**, while the agent runs as `HERMES_UID=1002`. The agent then cannot
+read files the container wrote, and logs this on every start:
+
+```
+Ignoring corrupted tree cache file .../models--Systran--faster-whisper-base/trees/....json:
+[Errno 13] Permission denied
+```
+
+31 paths under `cache/huggingface` are root-owned. Nothing breaks — the model
+still loads, because it falls back past the corrupted tree cache — but it is
+noise that hides real errors. Fix:
+
+```bash
+sudo chown -R 1002:1002 /srv/hermes/data/cache
+```
+
+Do it while the container is idle; it re-writes its own tree cache on the next
+run.
+
 ## The spine (subjects)
 
 Markdown only, nothing derived, no `triage.py` involvement. Laying it down is
@@ -368,10 +426,6 @@ Remove the `external_dirs` lines by hand rather than with `sed`: the `skills:`
 block holds `creation_nudge_interval` and comments that a range delete would
 take with it. Timestamped `config.yaml.bak-*` files are in
 `/srv/hermes/data/` from the install.
-
-Remove the `external_dirs` lines by hand rather than with `sed`: the `skills:`
-block may hold other settings (`create_dir`, skill config) that a range delete
-would take with it.
 
 Nothing else changes. `triage.py` and the labels are untouched by this deploy.
 
