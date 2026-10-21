@@ -122,4 +122,11 @@ Append-only. Newest entries go at the bottom. Format: date, decision, reason, st
 - Ship skills via `skills.external_dirs` in `config.yaml`, not a copy into `/opt/data/skills`, so the repo stays the source of truth and a `git pull` + restart is the whole update.
 - Status: decided.
 
+## 2026-10-21: deploy-time corrections (verified on `ai-assistant`)
+- External skill dirs are **read-only** (the container's own `config.yaml` says so), so the "git pull plus restart" update path above is wrong: an update is a tar copy into `/opt/data/repo/skills` plus a restart. The upside stands — the agent cannot edit the checkout.
+- The container runs as **root**, not as `HERMES_UID`. Anything it writes is root-owned, so `chown 1002:1002` is an explicit step, not something the image handles.
+- `/opt/data` **is** a bind mount of `/srv/hermes/data` (the compose file was right). `docker exec grep /proc/mounts` is misleading: the container sees the host's mount table and reports the host root device.
+- The config lives at `/srv/hermes/data/config.yaml` (inside `data/`), not beside `docker-compose.yml`. A backup step pointed at the wrong path failed silently — always check the backup exists.
+- Status: decided.
+
 

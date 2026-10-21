@@ -233,87 +233,141 @@ swap**, so a large model can OOM the gateway.
 ## The spine (subjects)
 
 Markdown only, nothing derived, no `triage.py` involvement. Laying it down is
-additive and safe: if it goes wrong, delete `/srv/hermes/data/spine` and nothing
-else is affected.
+additive and safe: if it goes wrong, delete `/opt/data/spine` and
+`/opt/data/repo` and nothing else is affected.
+
+Deployed 2026-10-21. What is actually on `ai-assistant` (verified, not assumed):
+
+| Fact | Value | Why it matters |
+|---|---|---|
+| `/opt/data` | bind mount of `/srv/hermes/data` | so the host path is `/srv/hermes/data/{repo,spine}`; a bind mount is why `grep /proc/mounts` misleads (it shows the host root) |
+| compose project | `/srv/hermes`, config `/srv/hermes/data/config.yaml` | `cd /srv/hermes` fails for `greyroot` (mode 700, owned by `hermes`): use `--project-directory` |
+| container user | **root**, env `HERMES_UID=1002` | files written by the container are root-owned; `chown 1002:1002` explicitly |
+| `HERMES_WRITE_SAFE_ROOT` | `/opt/data` | the agent cannot write outside it, so the spine must live under it |
+| `skills.external_dirs` | was **commented out** at line 1153 | the block had to be uncommented, not appended |
 
 ### Install
 
-The repo is the source of truth for our skills; the VM should not hold a copy
-that can drift. Register `skills/` as an **external skill directory** once:
+The repo is the source of truth for our skills. Register `skills/` as an
+**external skill directory** once — the key already existed in `config.yaml`
+as a commented-out example, so uncomment it rather than appending a new block:
 
 ```yaml
-# /srv/hermes/data/config.yaml  (in the container: /opt/data/config.yaml)
+# /opt/data/config.yaml  (host path: /srv/hermes/data/config.yaml — inside data/,
+# NOT /srv/hermes/config.yaml; the latter does not exist)
 skills:
+  creation_nudge_interval: 15
   external_dirs:
-    - /opt/data/repo/skills      # wherever the checkout is mounted, see below
+    - /opt/data/repo/skills
 ```
 
-The checkout has to be inside the data volume or readable from the container —
-`/srv/hermes/data/repo` is the simple choice, and it is covered by the backup.
-Paths support `${VAR}` substitution, so `- ${SKILLS_REPO}/skills` also works.
+External dirs are **read-only**: the container's own config comment says skill
+creation always writes to `~/.hermes/skills/`. So the agent cannot edit the
+checkout, which is what we want — but it also means an update is always a copy
+plus a restart, never a `git pull` in place.
 
 ```bash
-# On the VM, from the repo checkout.
-git clone <repo> /srv/hermes/data/repo     # or rsync the checkout there
-chown -R hermes:hermes /srv/hermes/data/repo
+# 1. Back up the config first. A bad edit stops the container from starting.
+#    It lives inside data/, not beside docker-compose.yml. Use `set -e` or check
+#    that the backup appeared: a wrong path here fails silently.
+sudo cp -a /srv/hermes/data/config.yaml /srv/hermes/data/config.yaml.bak-$(date +%F-%H%M%S)
+sudo ls -l /srv/hermes/data/config.yaml.bak-* | tail -1
 
-# The spine tree: an empty skeleton plus the rules. No data is copied in.
-install -d -o hermes -g hermes -m 750 /srv/hermes/data/spine/subjects
-install -d -o hermes -g hermes -m 750 /srv/hermes/data/spine/lists
-cp spine/README.md /srv/hermes/data/spine/README.md
-chown hermes:hermes /srv/hermes/data/spine/README.md
+# 2. Get the files in. Everything under /opt/data goes through the container
+#    so ownership is consistent; tar avoids needing git on the VM.
+tar czf /tmp/grokbot-spine.tgz -C <checkout> skills/subjects spine/README.md
+scp /tmp/grokbot-spine.tgz greyroot@10.10.10.123:/tmp/
+sudo docker cp /tmp/grokbot-spine.tgz hermes:/tmp/
+sudo docker exec hermes sh -c '
+  mkdir -p /opt/data/repo/skills /opt/data/spine/subjects /opt/data/spine/lists
+  tar xzf /tmp/grokbot-spine.tgz -C /opt/data/repo
+  mv /opt/data/repo/spine/README.md /opt/data/spine/README.md
+  rmdir /opt/data/repo/spine
+  rm /tmp/grokbot-spine.tgz
+  chown -R 1002:1002 /opt/data/repo /opt/data/spine
+  chmod 750 /opt/data/spine'
 
-docker compose restart      # safe: reloads skills, does not recreate
+# 3. Edit config.yaml as in the YAML above, then prove it still parses.
+sudo docker exec hermes /opt/hermes/.venv/bin/python -c \
+  "import yaml; print(yaml.safe_load(open('/opt/data/config.yaml'))['skills'])"
+
+# 4. Restart. From a non-root user this must be backgrounded or it hangs.
+sudo docker compose --project-directory /srv/hermes restart hermes
 ```
-
-External dirs are rescanned on restart, so a `git pull` plus a restart is the
-whole update path for skills. Notes from the upstream docs that matter here:
-
-- **Precedence** is `project → ~/.hermes/skills (here: /opt/data/skills) → skills.create_dir → external_dirs`. A stale copy of `subjects` in `/opt/data/skills/` would **shadow** the repo version and be logged as shadowed. If a change does not take effect, look for a duplicate there first.
-- **External dirs are not read-only.** If `/opt/data/repo` is writable by the
-  container user, the agent's `skill_manage` can edit files in the checkout. That
-  is acceptable here (it is a git checkout, so `git diff` shows any change), but
-  do not sync it back blindly.
-
 
 ### Verify
 
-```bash
-# The skill is discovered from the external dir, not a copy.
-docker compose exec hermes hermes skills list | grep subjects
-docker compose exec hermes ls /opt/data/repo/skills/subjects/
+Two checks prove discovery; both were run on 2026-10-21 and passed.
 
-# The validator runs, and finds nothing yet.
-docker compose exec hermes /opt/hermes/.venv/bin/python \
+```bash
+# Discovered, and reported as external (not "local").
+sudo docker exec hermes hermes skills list | grep subjects
+# │ subjects │ │ external │ local │ enabled │
+
+# No copy in /opt/data/skills, so nothing shadows the repo version.
+sudo docker exec hermes ls /opt/data/skills | grep -i subjects   # no output
+
+# Empty spine: exit 2 is correct here.
+sudo docker exec hermes /opt/hermes/.venv/bin/python \
   /opt/data/repo/skills/subjects/validate.py
-# expect: exit 2, "no subjects in /opt/data/spine/subjects"
+# no subjects in /opt/data/spine/subjects / exit=2
 ```
+
+The validator was also exercised on the VM against a throwaway subject:
+`EXAMPLE.md` copied and renamed gave `ok: 1 subject(s) valid` (exit 0), and
+`kind: nonsense` gave exit 1 with the offending value named. The subject was
+removed afterwards.
 
 Then the real test, from Telegram:
 
 1. "Create a subject for the house" — expect a proposed name, then a folder.
 2. "Add: get the geyser checked, due next Friday"
 3. "What's due?"
-4. On the VM: `find /srv/hermes/data/spine -type f` shows `SUBJECT.md` and
-   `timeline.md`, and the validator now exits 0.
+4. On the VM: `sudo docker exec hermes find /opt/data/spine -type f` shows
+   `SUBJECT.md` and `timeline.md`, and the validator now exits 0.
 
 Failure to check first: a container that runs but the bot says it cannot write.
-That is almost always ownership — the files must be owned by `hermes`, because
-the container runs as `$HERMES_UID`.
+Ownership is the likely cause — the container runs as **root**, so anything it
+creates is root-owned, and the agent itself runs as `HERMES_UID=1002`.
 
 ```bash
-ls -la /srv/hermes/data/spine/subjects/
-# anything root-owned is the bug:
-sudo chown -R "$(id -u hermes):$(id -g hermes)" /srv/hermes/data/spine
+sudo docker exec hermes ls -laR /opt/data/spine
+# anything not 1002:1002 is the bug:
+sudo docker exec hermes chown -R 1002:1002 /opt/data/spine
 ```
+
+### Updating a skill
+
+External dirs are read-only and not a live mount, so `git pull` on the VM does
+nothing. Copy the changed folder in and restart:
+
+```bash
+tar czf /tmp/skills.tgz -C <checkout> skills/subjects
+scp /tmp/skills.tgz greyroot@10.10.10.123:/tmp/
+sudo docker cp /tmp/skills.tgz hermes:/tmp/
+sudo docker exec hermes sh -c '
+  rm -rf /opt/data/repo/skills/subjects
+  tar xzf /tmp/skills.tgz -C /opt/data/repo && rm /tmp/skills.tgz
+  chown -R 1002:1002 /opt/data/repo/skills'
+sudo docker compose --project-directory /srv/hermes restart hermes
+```
+
+`rm -rf` is safe on `repo/skills` (ours, rebuilt from git). It is **never** safe
+on `/opt/data/spine`, which holds the user's subjects.
 
 ### Rollback
 
 ```bash
-rm -rf /srv/hermes/data/spine                  # take a copy of this first
-$EDITOR /srv/hermes/data/config.yaml           # delete the skills.external_dirs entries
-docker compose restart
+sudo docker exec hermes rm -rf /opt/data/repo      # skills
+# keep or delete /opt/data/spine — it holds real subjects, take a copy first
+$EDITOR /srv/hermes/data/config.yaml               # drop skills.external_dirs
+sudo docker compose --project-directory /srv/hermes restart hermes
 ```
+
+Remove the `external_dirs` lines by hand rather than with `sed`: the `skills:`
+block holds `creation_nudge_interval` and comments that a range delete would
+take with it. Timestamped `config.yaml.bak-*` files are in
+`/srv/hermes/data/` from the install.
 
 Remove the `external_dirs` lines by hand rather than with `sed`: the `skills:`
 block may hold other settings (`create_dir`, skill config) that a range delete

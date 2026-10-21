@@ -28,14 +28,20 @@
   single-tenant first but multi-tenant-ready.
 - **2026-10-21:** Wrote `docs/research/2026-10-21-market.md` (demand evidence, competitor pricing, our running costs).
   `SOUL.md` and `docs/PLAN.md` were reframed to match; `CLAUDE.md`'s file table updated.
+- **2026-10-21:** Built and deployed spine step 1. `skills/subjects/` (`SKILL.md`, `EXAMPLE.md`, read-only `validate.py`)
+  and the empty `spine/` tree are on `ai-assistant` at `/srv/hermes/data/{repo/skills,spine}`, registered through
+  `skills.external_dirs` and verified as `external / enabled` in `hermes skills list`. Nothing touches `triage.py`.
+  Also recorded what the box actually looks like, in `deploy/README.md` — several of our assumptions were wrong:
+  the container runs as **root** (`HERMES_UID=1002`), the config is at `/srv/hermes/data/config.yaml` (not beside
+  `docker-compose.yml`), and external dirs are **read-only**, so a skill update is a copy plus a restart, not a `git pull`.
 
 ## Next
 - [ ] **User: create VM 123 `ai-assistant`** (spec in `docs/HANDOVER.md` → "VM 123 specification"). Tell me when `greyroot` is reachable.
 - [ ] **User: fill `deploy/.env`** (gitignored) with `DEEPSEEK_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_USERS`. Values never go into chat or git.
 - [ ] **User: confirm the five CAT run times** (08:00 / 10:30 / 13:00 / 15:30 / 17:30 proposed).
 - [ ] Phase 1 install, once the VM exists: copy `deploy/` to `/srv/hermes`, `docker compose up -d`, `hermes setup` (DeepSeek + `deepseek-flash` + Telegram), verify the Telegram round-trip (`deploy/README.md`).
-- [ ] **Build the spine, step 1** (`docs/TASK-SPINE.md` → "What gets built, in order"): `spine/` layout and a `subjects` skill
-      (create / list / show / set status and next action / append to timeline). Markdown only — no index, no database yet.
+- [ ] **Build the spine, step 1** — **done and deployed 2026-10-21** (see above). Remaining: the Telegram smoke test
+      (create a subject, add a task with a due date, ask "what's due?", confirm files on the VM).
 - [ ] Then upgrade `triage.py` so needs-you **upserts a task** on a subject instead of only labelling.
 - [ ] Create a Google OAuth client (Gmail, Calendar and Tasks scopes) for the bot.
 - [ ] Finish `skills/inbox-triage/triage.py` against the Gmail API, then run it in shadow mode for a week.
