@@ -1,0 +1,5 @@
+# Keeps the bind-mount target in git. The contents are Hermes' own state
+# (config, sessions, memory, skills it writes itself) and are NEVER committed.
+# Untracked by the rule below, but the directory itself is kept.
+*
+!.gitignore

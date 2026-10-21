@@ -1,0 +1,51 @@
+# Hermes Agent on the ai-assistant VM.
+#
+#   docker compose up -d
+#
+# Lives at /srv/hermes/docker-compose.yml on the VM, next to the .env file
+# (mode 600, owned by the non-root `hermes` user).
+#
+# Deliberate choices:
+#   - Image pinned to a release tag, never `latest`, so updates are explicit and
+#     a rollback is a one-line tag change.
+#   - No `ports:` section. The Telegram gateway uses long polling, so the bot
+#     needs no inbound connection at all. Reach the VM over NetBird if you need
+#     to get in.
+#   - All state is in one bind mount, /srv/hermes/data -> /opt/data, so backups
+#     are a directory copy. Treat that directory as secret: it holds sessions,
+#     memory and API keys.
+#   - restart: unless-stopped, so the bot comes back after a reboot.
+
+services:
+  hermes:
+    image: ${HERMES_IMAGE:-nousresearch/hermes-agent:v0.22.2}
+    container_name: hermes
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - HERMES_HOME=/opt/data
+      # Container clock in the user's timezone, so cron times and timestamps
+      # read the same as the rest of the server.
+      - TZ=Africa/Johannesburg
+    volumes:
+      - ./data:/opt/data
+    # Cron jobs live in the gateway process; the data directory holds them.
+    command: ["gateway"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "hermes", "--version"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+# The container runs as the `hermes` user (HERMES_UID / HERMES_GID in .env).
+# If /srv/hermes/data ends up owned by root after the first start, fix it once:
+#   sudo chown -R "$(id -u hermes):$(id -g hermes)" /srv/hermes/data
+# Also make sure the user is in the `docker` group:
+#   sudo usermod -aG docker hermes
