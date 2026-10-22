@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.error
@@ -99,6 +100,45 @@ def is_protected(message: dict) -> bool:
     )
     return any(token in haystack for token in NEVER_RUBBISH)
 
+
+# Recipient-keyed routing. The classifier only ever sees from/subject/snippet,
+# so a rule about *which* address received the mail cannot be left to the model.
+# Cool Ideas bills two accounts: the plain address is dead noise, the alias is
+# the live line. The user said so on 2026-10-22.
+ROUTED_DOMAINS = ("coolideas.co.za",)
+ROUTED_PRIMARY = "mo@greyonion.com"
+ROUTED_ALIAS = re.compile(r"mo\+[^@\s<>,]*@greyonion\.com", re.I)
+
+
+def routing_override(message: dict) -> str | None:
+    """Bucket forced by recipient address, or None to keep the model's call."""
+    sender = (message.get("from") or "").lower()
+    to = (message.get("to") or "").lower()
+    if not any(domain in sender for domain in ROUTED_DOMAINS):
+        return None
+    if ROUTED_ALIAS.search(to):
+        return "needs-you"
+    if ROUTED_PRIMARY in to:
+        return "rubbish"
+    return None
+
+
+# Sender-keyed rulings, matched on domain *and* a phrase in the subject. Narrow
+# on purpose: bunny.net also sends billing mail, so only its security newsletter
+# is noise. Everything else from a vendor stays eligible for needs-you.
+SENDER_RULES = (
+    ("bunny.net", "security update", "rubbish"),
+)
+
+
+def sender_override(message: dict) -> str | None:
+    """Bucket forced by sender+subject pair, or None."""
+    sender = (message.get("from") or "").lower()
+    subject = (message.get("subject") or "").lower()
+    for domain, phrase, bucket in SENDER_RULES:
+        if domain in sender and phrase in subject:
+            return bucket
+    return None
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -284,6 +324,14 @@ def classify_batch(messages: list[dict]) -> dict[str, str]:
         mid = str(msg.get("id"))
         if buckets.get(mid) == "rubbish" and is_protected(msg):
             buckets[mid] = "needs-you"
+
+    # Recipient-keyed routing runs last and wins both ways: the dead Cool Ideas
+    # address is noise even when the subject screams overdue, and the alias is
+    # live even when the model would shrug it off.
+    for msg in messages:
+        forced = routing_override(msg) or sender_override(msg)
+        if forced:
+            buckets[str(msg.get("id"))] = forced
 
     return buckets
 

@@ -91,6 +91,14 @@ bullet points, no sub-lists.
   does not exist in this phase.
 - **Do not touch `triage.py`.** Triage labels mail on its own; it does not write
   here yet.
+- **Never state a fact you have not checked.** Before you say a file, folder or
+  subject exists, read it. Before you say one is gone, look for it. If you did not
+  look, say "I haven't checked" — do not reason from what ought to be there and
+  present the conclusion as observation. A status update that blends verified
+  facts with guesses is worse than no update.
+- **When corrected, re-check before replying.** If the user says something is not
+  there, look again and report what you actually see. Never explain the absence by
+  inventing a cause ("something removed it") — you did not see that happen.
 
 ## Validating
 
