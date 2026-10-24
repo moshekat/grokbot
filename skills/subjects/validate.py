@@ -166,15 +166,25 @@ def check_one(path: Path, node_id: str | None = None) -> list[str]:
 def discover(subjects: Path) -> dict[str, Path]:
     """Every node file under a subject, keyed by the id in its frontmatter.
 
-    Subjects are `<root>/subjects/<id>/SUBJECT.md`; a node deeper down is
-    `<root>/subjects/<top>/tasks/<id>.md` at any depth. The folder name is only a
-    fallback id — the frontmatter wins, because that is what references point at.
+    A node is any `.md` under a subject folder other than the subject's own
+    `SUBJECT.md` — strands nest freely, so `tasks/geyser/quote.md` is as real as
+    `tasks/quote.md`. Matching only `tasks/*.md` (one level) silently skipped
+    everything nested deeper, and a skipped node is never checked, so a broken
+    parent in it went unreported. `timeline.md` is the log, not a node.
+
+    The folder name is only a fallback id — the frontmatter wins, because that is
+    what references point at.
     """
     found: dict[str, Path] = {}
+    skip = {"SUBJECT.md", "timeline.md"}
     for path in sorted(subjects.rglob("SUBJECT.md")):
         found[path.parent.name] = path
-    for path in sorted(subjects.rglob("tasks/*.md")):
-        found[path.stem] = path
+    for path in sorted(subjects.rglob("*.md")):
+        if path.name in skip or path == path.parent / "SUBJECT.md":
+            continue
+        if path.name.startswith("."):
+            continue
+        found.setdefault(path.stem, path)
     return found
 
 

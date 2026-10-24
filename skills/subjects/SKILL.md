@@ -17,7 +17,7 @@ You write the files yourself with your file tools.
 |---|---|
 | Spine root | `$SPINE_ROOT`, else `$HERMES_HOME/spine` (on the VM: `/opt/data/spine`) |
 | Subjects | `<root>/subjects/<id>/SUBJECT.md` |
-| Strands and tasks | `<root>/subjects/<subject>/tasks/<id>.md` (nested freely) |
+| Strands and tasks | `<root>/subjects/<subject>/tasks/<id>.md`, nested freely — `tasks/geyser/quote.md` is a real node, not a subfolder to ignore |
 | Log | `<root>/subjects/<id>/timeline.md` (the subject's log) |
 | Docs | `<root>/subjects/<id>/docs/` |
 | Mail | `<root>/subjects/<id>/mail/` |
@@ -100,7 +100,7 @@ the fields.** The word "remind" is the cue to set a clock.
 
 | Ask | What you do |
 |---|---|
-| "what's on my plate" / "what's due" | walk `<root>/subjects/**/tasks/*.md` plus each `SUBJECT.md`, read frontmatter, answer sorted by `due` (undated last) |
+| "what's on my plate" / "what's due" | walk every `.md` under `<root>/subjects/` except each `timeline.md` and the subjects' own body, read frontmatter, consider only `status: active`/`waiting`, answer sorted by `due` (undated last) |
 | "where are we with X" | read `X`'s file, then its children, then the last ~10 lines of the log. **Answer in two lines: history, then current.** Never read a stored summary — there isn't one; compose it now from the open items and the log |
 | add a task | write `<subject>/tasks/<id>.md` with `parent:`, one file per task. Do **not** append to a `## Tasks` bullet list any more |
 | add a strand | a file with `parent:` pointing at its subject; tasks point at the strand |
@@ -114,6 +114,26 @@ the fields.** The word "remind" is the cue to set a clock.
 open child (nearest `due`, then nearest `remind_at`, then oldest). Compute it when
 asked; never store it. A stored next action goes stale and then gets read back as
 current fact.
+
+### An old `## Tasks` bullet is not a second task, and not yours to delete
+
+Files written before this schema carry `- [ ] something — due DATE` bullets under
+`## Tasks`, and a `next_action:` line. Both are **history**, and the file may say
+something the new node file does not (here: the geyser check, due 2026-10-23, with no
+task file at all).
+
+- **Never delete them to remove a contradiction.** Deleting is how a real obligation
+  disappears: nobody can then tell whether it was done or dropped. Both of these
+  happened before `schema: 1`, so they are evidence, not clutter.
+- **The task files are the truth about what is open.** A bullet with no matching
+  task file means the thing was never migrated — say so, and offer to *create* the
+  task file from it, preserving its `due`.
+- **Migrating is a separate, explicit job.** Only when the user says "migrate home",
+  do you: create one task file per open bullet (keeping `due`), append one log line
+  per bullet you converted, then remove the bullet. Report each one as it goes.
+- If asked to "clean up" a subject, propose the migration and wait. A subject whose
+  history contradicts itself is honest; a subject whose history was quietly deleted
+  is not.
 
 Answer questions from the files, not from memory of what you wrote earlier in the
 conversation.
