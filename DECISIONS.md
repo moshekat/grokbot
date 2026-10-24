@@ -129,4 +129,27 @@ Append-only. Newest entries go at the bottom. Format: date, decision, reason, st
 - The config lives at `/srv/hermes/data/config.yaml` (inside `data/`), not beside `docker-compose.yml`. A backup step pointed at the wrong path failed silently — always check the backup exists.
 - Status: decided.
 
+## 2026-10-24: one recursive node type; the spine is read as a newspaper
+- The flat `## Tasks` list plus a single `next_action` cannot hold a real matter: the divorce has three letters out and a lawyer we are waiting on, and frontmatter holds exactly one next action.
+- Replaced by **one node type** whose depth is a `parent:` pointer. Subject, strand and task are the same file at different depths; strand-versus-task is *derived* (has children ⇒ strand), so it is never stored and never goes stale. Depths: subject → strand → task, with the validator warning past three.
+- Every level renders as **headline → subhead → bulk**. The user sees headlines only; detail is behind a push.
+- The one-line **history** and one-line **current** the user asked for are **rendered at read time and never stored**. A stored summary is a cache with no invalidation and would be read back as current fact a week later — the same drift already observed in triage (`7/14/22` then `5/15/23` on identical input, an hour apart).
+- `next_action` is therefore removed rather than kept alongside: it is the stored-cache mistake at subject level and already duplicates `## Tasks`.
+- Reason: the user's own model is a newspaper, and a flat checklist forces a real matter to be flattened into something that cannot answer "where are we with X".
+- Design: `docs/FRONT-PAGE.md`. Status: decided; not yet built.
 
+## 2026-10-24: a task and a reminder are one object with two aspects
+- The user cannot (and should not have to) classify a thing as a task or a reminder. They are the same node: a **job** (`status`, children, `## Log`) plus an optional **clock** (`remind_at`, `recur`, `nag`).
+- The user speaks; the assistant sets the flags. "Remind me…" is the cue to set a clock. Nothing is filed by the user into a bucket.
+- Three clock modes: **fixed**, **interval since completion** (phone my sister within 14 days of the last time I did it — a calendar recurrence cannot express this), and **nag until done** (taxes).
+- "Call Steve again" is **not** a new node and **not** a separate reminder: it is a snooze plus a log line on the existing node, so one node accumulates the attempts instead of three fragmenting the story.
+- **Snooze is first-class** and must be the cheapest action in the system: one sentence, no confirmation, no new node.
+- Reason: the user has ADHD and said managing this is hard. The governing principle is that the system comes to the user; they never have to remember to check a list.
+- Status: decided; not yet built.
+
+## 2026-10-24: keep the storage shape changeable, but write no abstraction early
+- The user intends to sell this eventually and wants the data shape changeable (e.g. a task that must own PDFs, where file paths stop being an adequate reference).
+- Four rules instead of a swappable-backend interface: (1) **one seam** — all spine access through `store.py` verbs; (2) **identity is an id, never a path** — parents, mail and calendar reference `sign-letter`, not a file location; (3) **attachments are opaque handles plus a resolver**, never absolute paths; (4) **`schema: 1`** in frontmatter so a later format change can be read and migrated rather than silently misread.
+- Explicitly **not** doing: an abstract store with pluggable backends written before a second backend exists. That produces a system mediocre at two things and debuggable at neither. The seam exists with one implementation until a real second one appears.
+- Reason: the migration pain the user is worried about is caused by *paths leaking into references*, not by Markdown. Rules 2 and 3 remove the cause; rule 1 makes the eventual swap one file.
+- Status: decided; rules 1–4 land with the node schema.

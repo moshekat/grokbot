@@ -21,6 +21,8 @@ no client data. Infrastructure specifics belong in the private ProxHetz repo or 
 |---|---|
 | `docs/HANDOVER.md` | **Current state and the next concrete steps**, plus today's verified facts (Hermes version, Docker image, model names, prices) |
 | `docs/TASK-SPINE.md` | **The product design**: subjects → tasks → calendar/reminders/lists; the files-first store and its derived SQLite index |
+| `docs/FRONT-PAGE.md` | **How the spine is read and shown**: one recursive node type, headline/subhead/bulk, tasks and reminders as one object, the four views, the storage seam |
+
 | `docs/research/2026-10-20-landscape.md` | What Grok Bot is, its features and pricing, and the open-source alternatives (with sources) |
 | `docs/research/2026-10-21-market.md` | Demand evidence, competitor pricing and our running costs; why a generic assistant has no moat |
 | `docs/PLAN.md` | Recommended plan and phases |

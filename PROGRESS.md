@@ -34,8 +34,18 @@
   Also recorded what the box actually looks like, in `deploy/README.md` — several of our assumptions were wrong:
   the container runs as **root** (`HERMES_UID=1002`), the config is at `/srv/hermes/data/config.yaml` (not beside
   `docker-compose.yml`), and external dirs are **read-only**, so a skill update is a copy plus a restart, not a `git pull`.
+- **2026-10-24:** Designed how the spine is **read**, in `docs/FRONT-PAGE.md` (decisions logged in `DECISIONS.md`):
+  one recursive node type whose depth is a `parent:` pointer, rendered as **headline → subhead → bulk** at every
+  depth; the two-line "history / current" answer is **computed at read time and never stored**; tasks and reminders
+  are one object with an optional clock (`remind_at` / interval-since-completion / nag); four views over one spine
+  (Today, Subjects, Inbox, Say); four rules that keep the storage shape changeable without building an abstraction
+  early (one seam, ids not paths, opaque attachment handles, `schema: 1`). Nothing built yet. The doc also records
+  which frontmatter fields the current `validate.py` still rejects, verified by running it against a test subject.
 
 ## Next
+- [ ] **Build the node schema** (`docs/FRONT-PAGE.md` → "What gets built, in order", step 1): add `schema`, `parent`,
+      `remind_at`, `recur`, `nag`, `attachments` to `validate.py`'s allowed fields, derive `kind` instead of requiring it,
+      drop `next_action`, and add tree checks (orphan, missing parent, cycle, depth warning past three). Migrate `home` first.
 - [ ] **User: create VM 123 `ai-assistant`** (spec in `docs/HANDOVER.md` → "VM 123 specification"). Tell me when `greyroot` is reachable.
 - [ ] **User: fill `deploy/.env`** (gitignored) with `DEEPSEEK_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_USERS`. Values never go into chat or git.
 - [ ] **User: confirm the five CAT run times** (08:00 / 10:30 / 13:00 / 15:30 / 17:30 proposed).
