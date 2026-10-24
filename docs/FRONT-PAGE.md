@@ -206,12 +206,12 @@ what the lawyer said, why we chose this, what is blocked and on whom.
 is the "bulk" the user is talking about when they say *"keep track of all the context
 in that task"*.
 
-**This schema does not exist yet.** `validate.py` today accepts only
-`id, title, kind, status, updated, next_action, due, people, tags`, and rejects any
-unknown field. `schema`, `parent`, `remind_at`, `recur`, `nag` and `attachments` are
-new in step 1, and `kind` becomes derived rather than required. Until that step lands,
-writing any of these fields into a real subject fails validation by design — the
-validator is doing its job.
+**Status: built and deployed 2026-10-24.** `validate.py` implements exactly the
+fields above, plus tree checks (missing parent, cycles, a warning past three levels).
+`kind` is optional and no longer says what a node is — depth does. `next_action` is
+still *accepted* so files written before this change keep validating, but it is
+deprecated and nothing should write it: the next action is computed. The real `home`
+on the VM still validated unchanged, so no migration was needed.
 
 ## The storage seam
 
@@ -244,9 +244,10 @@ second one appears.
 
 ## What gets built, in order
 
-1. **The node schema**: `tasks/<id>.md` under a subject, `schema: 1`, `parent`, kind
-   derived, clocks optional. `EXAMPLE.md` and `validate.py` extended; the validator
-   gains tree checks (orphan, cycle, missing parent, depth warning).
+1. ~~**The node schema**~~: **done and deployed 2026-10-24.** `tasks/<id>.md` under a
+   subject, `schema: 1`, `parent`, kind derived, clocks optional; `EXAMPLE.md` and
+   `validate.py` extended; tree checks (orphan, cycle, missing parent, depth warning)
+   are live.
 2. **The renderer**: one module that turns a node into headline / subhead /
    history+current. One place decides what is a headline and what is detail, so the
    front page and the drill-down cannot disagree.

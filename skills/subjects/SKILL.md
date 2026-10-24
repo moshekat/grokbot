@@ -17,7 +17,8 @@ You write the files yourself with your file tools.
 |---|---|
 | Spine root | `$SPINE_ROOT`, else `$HERMES_HOME/spine` (on the VM: `/opt/data/spine`) |
 | Subjects | `<root>/subjects/<id>/SUBJECT.md` |
-| Timeline | `<root>/subjects/<id>/timeline.md` |
+| Strands and tasks | `<root>/subjects/<subject>/tasks/<id>.md` (nested freely) |
+| Log | `<root>/subjects/<id>/timeline.md` (the subject's log) |
 | Docs | `<root>/subjects/<id>/docs/` |
 | Mail | `<root>/subjects/<id>/mail/` |
 | Lists | `<root>/lists/<name>.md` |
@@ -37,33 +38,82 @@ that absolute path for the rest of the conversation.
 `<id>` is lowercase, hyphenated, and matches the folder name: `medical-aid`,
 `car`, `jane-doe`.
 
+## Adding a task or a strand
+
+A task is its own file: `<root>/subjects/<subject>/tasks/<id>.md`, with `parent:`
+set to the strand or subject it hangs under. Never add a `## Tasks` bullet to
+`SUBJECT.md` — that was the old flat shape and it cannot hold a strand with several
+live threads.
+
+A strand is the same file with `parent:` pointing at the subject. Nesting is how
+depth is expressed; there is no marker that says "this is a strand", because a
+node with children *is* one.
+
+Naming the files is a real decision, so propose it: `sign-letter`, not `task-4`.
+The id is what parents, mail links and calendar events point at.
+
 ## Frontmatter
 
-Required: `id`, `title`, `kind`, `status`, `updated`.
-Optional: `next_action`, `due`, `people`, `tags`.
+Required: `id`, `title`, `status`, `updated`.
+Optional: `schema`, `parent`, `kind`, `due`, `remind_at`, `recur`, `nag`, `people`,
+`tags`, `attachments`. (`next_action` is still accepted so old files validate, but it
+is **deprecated**: the next action is computed from the open tasks, never stored.)
 
 | Field | Values |
 |---|---|
-| `kind` | `person` · `project` · `admin` · `asset` · `place` |
+| `schema` | `1`. Write it. It is how a future format change gets migrated instead of misread |
+| `parent` | the `id` of the node this one hangs under; **omit on a subject** |
+| `kind` | `person` · `project` · `admin` · `asset` · `place` — a loose tag for matching mail, not what defines the node |
 | `status` | `active` · `waiting` · `dormant` · `done` |
-| `next_action` | one imperative line, required while `status: active` |
-| `due` | `YYYY-MM-DD`, the date the next action is due, not the project's |
+| `due` | `YYYY-MM-DD`, a bare date, no time |
+| `remind_at` | `YYYY-MM-DDTHH:MM`, the clock. A date without a time is rejected — that is what `due` is for |
+| `recur` | `after 14d` · `daily` · `weekly` · `monthly` · `yearly` |
+| `nag` | `true` / `false`. Keep firing on the `recur` cadence until the node is closed |
 | `people` | short tags for who is involved, `[spouse]`, `[broker]` |
 | `tags` | free keywords used to match mail later, `[insurance, health]` |
+| `attachments` | file names for documents this node owns, `[settlement-v3.pdf]`. Names or handles, never absolute paths |
 
 Style: tabs are forbidden, two-space indents, dates unquoted, `updated` set to
 today every time you touch the file.
+
+### What a node is, and what a clock is
+
+A **node is a node**: a subject, a strand and a task are the same file, and depth is
+the `parent` pointer. A node with children is a strand; a node without is a task.
+That is derived — never write it down.
+
+A **task and a reminder are the same object.** The job is `status`, the children and
+the log; the reminder is the clock:
+
+- `remind_at` alone — fires once, on that date and time.
+- `recur: after 14d` — fires 14 days after the node was last completed. Doing it
+  resets the timer. Use this whenever the user says "every so often", "if I haven't
+  spoken to her in a while", "when it's been too long". A calendar recurrence cannot
+  express this.
+- `recur: daily` (or weekly/monthly/yearly) + `nag: true` — keeps firing until closed.
+  Use this when the user names no date but the thing must not be forgotten.
+
+Never ask the user whether something is a task or a reminder. **They speak, you set
+the fields.** The word "remind" is the cue to set a clock.
 
 ## The operations
 
 | Ask | What you do |
 |---|---|
-| "what's on my plate" / "what's due" | glob `<root>/subjects/*/SUBJECT.md`, read frontmatter, answer sorted by `due` (undated last) |
-| "what's happening with X" | read `SUBJECT.md`, then the last ~10 lines of `timeline.md` |
-| add a task | append a `- [ ]` line under `## Tasks` in `SUBJECT.md`, update `next_action`, `due`, `updated` |
-| finish a task | tick it `- [x]` with `— done <date>`, append a timeline line, set the next `next_action` or ask what it should be |
-| an event happened | append **one** line to `timeline.md` |
+| "what's on my plate" / "what's due" | walk `<root>/subjects/**/tasks/*.md` plus each `SUBJECT.md`, read frontmatter, answer sorted by `due` (undated last) |
+| "where are we with X" | read `X`'s file, then its children, then the last ~10 lines of the log. **Answer in two lines: history, then current.** Never read a stored summary — there isn't one; compose it now from the open items and the log |
+| add a task | write `<subject>/tasks/<id>.md` with `parent:`, one file per task. Do **not** append to a `## Tasks` bullet list any more |
+| add a strand | a file with `parent:` pointing at its subject; tasks point at the strand |
+| finish a task | set `status: done`, append a log line, set `updated` |
+| snooze | move `remind_at` forward and append a log line. **Do not create a new node** — "remind me in two hours" is a snooze, not a new task |
+| "call Steve again" | the existing node is still open: snooze it and log the attempt (`tried Thu, no answer`). One node accumulates attempts |
+| an event happened | append **one** line to the log |
 | status change | edit `status` in frontmatter; if it stops being `active`, drop `due` |
+
+**`next_action` is not a field any more.** The next action of a strand is its hottest
+open child (nearest `due`, then nearest `remind_at`, then oldest). Compute it when
+asked; never store it. A stored next action goes stale and then gets read back as
+current fact.
 
 Answer questions from the files, not from memory of what you wrote earlier in the
 conversation.
@@ -102,17 +152,22 @@ bullet points, no sub-lists.
 
 ## Validating
 
-After writing or editing any `SUBJECT.md`, run:
+After writing or editing any node file, run:
 
 ```bash
 # Resolve the skill dir first; it is an external dir, not /opt/data/skills.
 SKILLS=/opt/data/repo/skills/subjects          # or wherever skills.external_dirs points
-/opt/hermes/.venv/bin/python "$SKILLS/validate.py"
-/opt/hermes/.venv/bin/python "$SKILLS/validate.py" medical-aid
+/opt/hermes/.venv/bin/python "$SKILLS/validate.py"          # the whole spine
+/opt/hermes/.venv/bin/python "$SKILLS/validate.py" divorce  # one subject and its subtree
 ```
 
-Exit 0 is `ok: N subject(s) valid`. Exit 1 lists every problem — fix them, don't
+Exit 0 is `ok: N node(s) valid`. Exit 1 lists every problem — fix them, don't
 report success until it exits 0. Exit 2 means there is nothing to check yet.
+
+It also checks the tree, not just the fields: a `parent` that does not exist, a
+parent chain that loops, and nesting deeper than three levels (subject → strand →
+task). The depth one is a warning about structure, not a broken file; say so rather
+than deleting something.
 
 Locally use `python3 validate.py --root /tmp/spine` instead of the container paths.
 
@@ -120,4 +175,4 @@ Locally use `python3 validate.py --root /tmp/spine` instead of the container pat
 
 - `SKILL.md`: this file.
 - `EXAMPLE.md`: the canonical subject. Copy its shape exactly.
-- `validate.py`: frontmatter checker. Reads only, never writes.
+- `validate.py`: frontmatter and tree checker. Reads only, never writes.

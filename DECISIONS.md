@@ -131,13 +131,6 @@ Append-only. Newest entries go at the bottom. Format: date, decision, reason, st
 
 ## 2026-10-24: one recursive node type; the spine is read as a newspaper
 - The flat `## Tasks` list plus a single `next_action` cannot hold a real matter: the divorce has three letters out and a lawyer we are waiting on, and frontmatter holds exactly one next action.
-- Replaced by **one node type** whose depth is a `parent:` pointer. Subject, strand and task are the same file at different depths; strand-versus-task is *derived* (has children ⇒ strand), so it is never stored and never goes stale. Depths: subject → strand → task, with the validator warning past three.
-- Every level renders as **headline → subhead → bulk**. The user sees headlines only; detail is behind a push.
-- The one-line **history** and one-line **current** the user asked for are **rendered at read time and never stored**. A stored summary is a cache with no invalidation and would be read back as current fact a week later — the same drift already observed in triage (`7/14/22` then `5/15/23` on identical input, an hour apart).
-- `next_action` is therefore removed rather than kept alongside: it is the stored-cache mistake at subject level and already duplicates `## Tasks`.
-- Reason: the user's own model is a newspaper, and a flat checklist forces a real matter to be flattened into something that cannot answer "where are we with X".
-- Design: `docs/FRONT-PAGE.md`. Status: decided; not yet built.
-
 ## 2026-10-24: a task and a reminder are one object with two aspects
 - The user cannot (and should not have to) classify a thing as a task or a reminder. They are the same node: a **job** (`status`, children, `## Log`) plus an optional **clock** (`remind_at`, `recur`, `nag`).
 - The user speaks; the assistant sets the flags. "Remind me…" is the cue to set a clock. Nothing is filed by the user into a bucket.
@@ -153,3 +146,18 @@ Append-only. Newest entries go at the bottom. Format: date, decision, reason, st
 - Explicitly **not** doing: an abstract store with pluggable backends written before a second backend exists. That produces a system mediocre at two things and debuggable at neither. The seam exists with one implementation until a real second one appears.
 - Reason: the migration pain the user is worried about is caused by *paths leaking into references*, not by Markdown. Rules 2 and 3 remove the cause; rule 1 makes the eventual swap one file.
 - Status: decided; rules 1–4 land with the node schema.
+
+## 2026-10-24: deploy backups must live outside `skills.external_dirs`
+- A tar backup taken *inside* `/opt/data/repo/skills/` (as `subjects.bak-<stamp>/`) was picked up by Hermes as a second skill, and in the same breath the real `subjects` skill stopped appearing in `hermes skills list` — both directories declare `name: subjects` in their frontmatter, so the duplicate shadowed the original.
+- Cause is ours, not Hermes': anything under an external skills dir is a skill. A backup is not a skill.
+- Rule: **back up out of tree** — `/srv/hermes/backups/<name>.bak-<stamp>/`. Never `cp -a` a skill dir next to itself.
+- Also: `chmod`/`ls` globs passed through `ssh` are expanded by the *local* shell first; quote them or let `tar` set the modes.
+- Status: decided; the 2026-10-24 backup has been moved to `/srv/hermes/backups/`.
+
+
+- Replaced by **one node type** whose depth is a `parent:` pointer. Subject, strand and task are the same file at different depths; strand-versus-task is *derived* (has children ⇒ strand), so it is never stored and never goes stale. Depths: subject → strand → task, with the validator warning past three.
+- Every level renders as **headline → subhead → bulk**. The user sees headlines only; detail is behind a push.
+- The one-line **history** and one-line **current** the user asked for are **rendered at read time and never stored**. A stored summary is a cache with no invalidation and would be read back as current fact a week later — the same drift already observed in triage (`7/14/22` then `5/15/23` on identical input, an hour apart).
+- `next_action` is therefore removed rather than kept alongside: it is the stored-cache mistake at subject level and already duplicates `## Tasks`.
+- Reason: the user's own model is a newspaper, and a flat checklist forces a real matter to be flattened into something that cannot answer "where are we with X".
+- Design: `docs/FRONT-PAGE.md`. Status: decided; not yet built.

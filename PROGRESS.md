@@ -41,11 +41,25 @@
   (Today, Subjects, Inbox, Say); four rules that keep the storage shape changeable without building an abstraction
   early (one seam, ids not paths, opaque attachment handles, `schema: 1`). Nothing built yet. The doc also records
   which frontmatter fields the current `validate.py` still rejects, verified by running it against a test subject.
+- **2026-10-24:** Pushed everything (`e73a4b0..f57dd06` to `origin/main`). Design docs are **not** deployed to the VM and
+  should not be: `/srv/hermes/data/repo/` mirrors only `skills/`, because that is all `skills.external_dirs` reads. There is
+  deliberately no `docs/` on the server.
+- **2026-10-24:** Built and deployed **spine step 1, the node schema**. `validate.py` now accepts `schema`, `parent`,
+  `kind`, `due`, `remind_at`, `recur`, `nag`, `people`, `tags`, `attachments`; `kind` is no longer required (depth says
+  what a node is); the `next_action`-required rule is gone (still accepted so old files validate). New **tree checks**:
+  missing parent, parent cycles, and a warning past three levels. `discover()` walks `subjects/**/SUBJECT.md` plus
+  `subjects/**/tasks/*.md`, so tasks are their own files at any depth. `EXAMPLE.md` and `SKILL.md` rewritten to match.
+  Verified: 8 failure modes each produce a clear message; a 4-node valid tree passes; the *real* `home` on the VM still
+  passes unchanged (so no migration was needed); deployed byte-identical (all three sha256 match) and the validator runs
+  clean **inside the container** on its own Python 3.14. Container healthy, skill `external / enabled`.
+  One deploy mistake, recorded: a backup taken inside `skills.external_dirs` registered as a second skill and shadowed
+  `subjects`; backups now go to `/srv/hermes/backups/`.
 
 ## Next
-- [ ] **Build the node schema** (`docs/FRONT-PAGE.md` → "What gets built, in order", step 1): add `schema`, `parent`,
-      `remind_at`, `recur`, `nag`, `attachments` to `validate.py`'s allowed fields, derive `kind` instead of requiring it,
-      drop `next_action`, and add tree checks (orphan, missing parent, cycle, depth warning past three). Migrate `home` first.
+- [x] ~~Build the node schema~~ — done and deployed 2026-10-24 (see above).
+- [ ] **Telegram smoke test of the new shape**: ask the bot for something on `home`, then have it add a task as a
+      `tasks/<id>.md` file with `parent: home` and a `remind_at` clock, and confirm it lands and validates.
+- [ ] The renderer (`docs/FRONT-PAGE.md` step 2): headline / subhead / history+current from the tree.
 - [ ] **User: create VM 123 `ai-assistant`** (spec in `docs/HANDOVER.md` → "VM 123 specification"). Tell me when `greyroot` is reachable.
 - [ ] **User: fill `deploy/.env`** (gitignored) with `DEEPSEEK_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_USERS`. Values never go into chat or git.
 - [ ] **User: confirm the five CAT run times** (08:00 / 10:30 / 13:00 / 15:30 / 17:30 proposed).

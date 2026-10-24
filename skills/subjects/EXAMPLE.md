@@ -1,9 +1,9 @@
 ---
+schema: 1
 id: medical-aid
 title: Medical aid
-kind: admin
 status: active
-next_action: Submit the 2026 claim for the physio visit
+kind: admin
 due: 2026-10-27
 people: [spouse]
 tags: [insurance, health]
@@ -14,10 +14,15 @@ updated: 2026-10-21
 
 The family policy, claim submissions and the annual review.
 
-## What's true now
+## Context
 
 - Claims go through the member portal; the reference prefix is `CLM`.
 - The 2026 rate increase lands in January; the review happens in November.
+
+## Log
+
+2026-10-21 — claim for the physio visit still to submit; broker emailed the dependant list
+2026-10-14 — emailed the broker the updated dependant list
 
 ## Tasks
 
