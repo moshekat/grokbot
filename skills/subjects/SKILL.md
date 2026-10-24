@@ -110,10 +110,15 @@ the fields.** The word "remind" is the cue to set a clock.
 | an event happened | append **one** line to the log |
 | status change | edit `status` in frontmatter; if it stops being `active`, drop `due` |
 
-**`next_action` is not a field any more.** The next action of a strand is its hottest
-open child (nearest `due`, then nearest `remind_at`, then oldest). Compute it when
-asked; never store it. A stored next action goes stale and then gets read back as
-current fact.
+**`next_action` is not a field any more.** The next action of a strand is its open
+child that needs attention *soonest* — the smallest date among `due` and `remind_at`,
+whichever is earlier, then oldest. Compute it when asked; never store it. A stored
+next action goes stale and then gets read back as current fact.
+
+An overdue `due` always wins: it is the longest-neglected thing, so it cannot be
+beaten by a clock later today. Say *when* it is due as well as which one it is — "the
+geyser check, 2 days overdue" — because the reason it won is the date, and the user
+needs that to judge it.
 
 ### An old `## Tasks` bullet is not a second task, and not yours to delete
 
@@ -137,6 +142,19 @@ task file at all).
 
 Answer questions from the files, not from memory of what you wrote earlier in the
 conversation.
+
+### Read the clock before you do date arithmetic
+
+"2 days overdue", "due tomorrow", "how long has this been open" are computed against
+**now**, not against whatever date you had in hand earlier. Run `date` and use what it
+says — the container's local date, which is the user's date.
+
+This bites hardest just after midnight: a conversation that started at 23:58 and
+finishes at 00:06 has a *different* today, so every "today", every `updated`, and every
+overdue count in the earlier half of it is now wrong. If midnight may have passed,
+re-read `date` before writing any date, and before saying a thing is overdue.
+
+Never say "overdue" without subtracting the file's `due` from the current date first.
 
 ## timeline.md
 
