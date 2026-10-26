@@ -35,7 +35,7 @@ MAX_DEPTH = 3  # subject -> strand -> task; deeper only warns
 REQUIRED = ("id", "title", "status", "updated")
 OPTIONAL = (
     "schema", "parent", "kind", "next_action",
-    "due", "remind_at", "recur", "nag",
+    "due", "remind_at", "recur", "nag", "waiting_on",
     "people", "tags", "attachments",
 )
 KINDS = {"person", "project", "admin", "asset", "place"}
@@ -109,6 +109,23 @@ def check_one(path: Path, node_id: str | None = None) -> list[str]:
     status = data.get("status")
     if status not in (None, "") and status not in STATUSES:
         problems.append(f"{label}: status '{status}' is not one of {sorted(STATUSES)}")
+
+    # `waiting` means someone else holds it, so it must say who and must carry a
+    # chase date. A wait with no clock is never looked at again — it is not open,
+    # it is forgotten, which is the exact failure this spine exists to stop.
+    if status == "waiting":
+        who = data.get("waiting_on")
+        if who in (None, ""):
+            problems.append(f"{label}: status 'waiting' needs waiting_on (who owes you a "
+                            f"reply), e.g. waiting_on: Megan Marks")
+        elif isinstance(who, list):
+            problems.append(f"{label}: waiting_on must be one short name, not a list")
+        if data.get("remind_at") in (None, "") and data.get("recur") in (None, ""):
+            problems.append(f"{label}: status 'waiting' needs a chase date — set remind_at "
+                            f"(when to nudge them), or the wait is never looked at again")
+    elif data.get("waiting_on") not in (None, ""):
+        problems.append(f"{label}: waiting_on only means something with status 'waiting' "
+                        f"(this node is '{status or 'unset'}')")
 
     # YAML turns an unquoted 2026-10-27 into a date; accept either, reject junk.
     for key in ("due", "updated"):

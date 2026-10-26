@@ -65,6 +65,7 @@ is **deprecated**: the next action is computed from the open tasks, never stored
 | `parent` | the `id` of the node this one hangs under; **omit on a subject** |
 | `kind` | `person` · `project` · `admin` · `asset` · `place` — a loose tag for matching mail, not what defines the node |
 | `status` | `active` · `waiting` · `dormant` · `done` |
+| `waiting_on` | who owes you the next move, short enough for a headline — `Megan Marks`. Required with `status: waiting`, meaningless without it |
 | `due` | `YYYY-MM-DD`, a bare date, no time |
 | `remind_at` | `YYYY-MM-DDTHH:MM`, the clock. A date without a time is rejected — that is what `due` is for |
 | `recur` | `after 14d` · `daily` · `weekly` · `monthly` · `yearly` |
@@ -109,6 +110,10 @@ the fields.** The word "remind" is the cue to set a clock.
 | "call Steve again" | the existing node is still open: snooze it and log the attempt (`tried Thu, no answer`). One node accumulates attempts |
 | an event happened | append **one** line to the log |
 | status change | edit `status` in frontmatter; if it stops being `active`, drop `due` |
+| send a mail that asks for something | **immediately** open a node with `status: waiting`, `waiting_on:` and a chase `remind_at`. The mail leaving is the start of the wait, not the end of the task |
+| they answered | read the answer, apply it, close the wait (`status: done`), log the outcome. If the answer obliges *you*, open a new node you hold |
+| the chase date fires | re-read the thread. Answered → close it. Silent → one line, offer the next chase. Never re-send unprompted |
+| "mark it written off" / "it self-resolves" | close the wait with a log line saying so. Do not delete the node — the record that you were waiting is the point |
 
 **`next_action` is not a field any more.** The next action of a strand is its open
 child that needs attention *soonest* — the smallest date among `due` and `remind_at`,
@@ -139,6 +144,68 @@ task file at all).
 - If asked to "clean up" a subject, propose the migration and wait. A subject whose
   history contradicts itself is honest; a subject whose history was quietly deleted
   is not.
+
+### Sending something does not finish it — it changes who is holding it
+
+The most common shape in this spine is not "do a thing". It is **"I have asked someone
+for something, and now I am waiting."** Sending the mail is not the end of the task; it
+is the moment the task changes hands. The user will not say "make me a reminder" — they
+will say "send this", and expect you to know that the ball is now with Megan.
+
+So whenever an outbound message asks another person to decide, pay, confirm, deliver or
+reply, **create or update the node in the same turn** — never "you didn't ask for a task,
+so I didn't make one". The work is not done because the mail left.
+
+```
+---
+schema: 1
+id: megan-invoice
+title: Megan's invoice for the missed session — withdrawn?
+parent: home
+status: waiting
+waiting_on: Megan Marks
+remind_at: 2026-11-02T09:00
+updated: 2026-10-26
+---
+```
+
+**`status: waiting` means someone else holds it.** `waiting_on` names who (a person or a
+company, short — it goes in a headline). The clock is a **chase date**, not a deadline:
+"if she has not answered by then, prompt me to follow up."
+
+| | `active` | `waiting` |
+|---|---|---|
+| Who moves next | the user | the other party |
+| What the clock means | when to start / finish | when to chase |
+| What firing means | do it now | nudge the other party, snooze again |
+
+A waiting node **must** have a `remind_at` — the validator rejects one without it. A wait
+with no clock is a thing that silently never comes back, which is the failure this whole
+section exists to prevent. Pick a chase date by the nature of the ask:
+
+| Ask | Chase after |
+|---|---|
+| A question or a decision | 3 days |
+| An invoice, payment or refund | 7 days |
+| A document or delivery they promised | 5 days |
+| Silence after a second chase | say so; do not chase a third time unasked |
+
+**When a waiting node fires, do not do the thing.** Re-read the thread first. If they
+answered and the answer is in the mailbox, apply it and close the node. If they have not,
+say so in one line and offer the next chase — never re-send unprompted, and never mark it
+done because time passed.
+
+**Both outcomes close the wait, not the subject.** "She said yes, the invoice is written
+off" and "she said no, it has to be paid" are both `status: done` on the waiting node, and
+the second may open a new one (`pay-megan-invoice`) that the user now holds. Log which
+happened, in the user's words.
+
+**A self-resolving notice does not need a node.** "Google Workspace payment failed, card
+expired" fixes itself on the next retry; "Cool Ideas will suspend you" is a real
+consequence. Before creating anything from mail, ask: *if I ignore this, does it go away
+or get worse?* If it goes away, label it and say why in one line — do not add it to the
+spine. Guessing "probably self-resolves" about a deadline is how a real one gets missed,
+so if you cannot tell, say you cannot tell rather than leaving it out.
 
 Answer questions from the files, not from memory of what you wrote earlier in the
 conversation.

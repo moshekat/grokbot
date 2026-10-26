@@ -161,3 +161,12 @@ Append-only. Newest entries go at the bottom. Format: date, decision, reason, st
 - `next_action` is therefore removed rather than kept alongside: it is the stored-cache mistake at subject level and already duplicates `## Tasks`.
 - Reason: the user's own model is a newspaper, and a flat checklist forces a real matter to be flattened into something that cannot answer "where are we with X".
 - Design: `docs/FRONT-PAGE.md`. Status: decided; not yet built.
+
+
+## 2026-10-26: a wait is a state, not the absence of a task
+- Sending a mail that asks someone to decide does not finish the task; it moves the task to the other party. Observed live: the Megan invoice reply was drafted, sent and verified, and no node was created, because no one said "make me a reminder".
+- So `status: waiting` now has a defined meaning — the other party holds the next move, and the clock is a **chase date**, not a deadline. `waiting_on` names who.
+- A waiting node without a chase date is rejected by the validator. That is deliberate: an untimed wait is not open, it is forgotten.
+- Rejected alternative: creating a *new* node when the chase fires. One node accumulates the chase, as with "call Steve again" — otherwise "waiting on Megan" and "chase Megan" become two half-truths.
+- Rejected alternative: a bridge that scans `AI/NeedsYou` for deadlines. The insight came from the user reading the list and picking one, not from extraction; and the 7-day triage window is already stale, so it could only be judged on future mail.
+- Status: built and deployed 2026-10-26 (`validate.py`, `SKILL.md`, `EXAMPLE.md`).
